@@ -28,39 +28,47 @@ u16 board[w * h];
 
 u8 remaining = 81;
 
-void propagate(u8 x, u8 y) {
+bool propagate(u8 x, u8 y) {
   remaining--;
 
   const auto rev = (~board[x + y * w] & full);
 
   for (auto i = 0; i < w; i++) {
-    if (i != x && !collapsed[board[i + y * w]]) {
+    if (i != x) {
       auto &cell = board[i + y * w];
+      if ((cell & rev) == 0) return false;
+      if (collapsed[cell]) continue;
       cell &= rev;
-      if (collapsed[cell]) propagate(i, y);
+      if (collapsed[cell] && !propagate(i, y)) return false;
     }
   }
 
   for (auto i = 0; i < h; i++) {
-    if (i != y && !collapsed[board[x + i * w]]) {
+    if (i != y) {
       auto &cell = board[x + i * w];
+      if ((cell & rev) == 0) return false;
+      if (collapsed[cell]) continue;
       cell &= rev;
-      if (collapsed[cell]) propagate(x, i);
+      if (collapsed[cell] && !propagate(x, i)) return false;
     }
   }
 
   for (auto i = 0; i < 3; i++) {
     for (auto j = 0; j < 3; j++) {
-      const u8 sub_x = (x / 3) * 3 + i;
-      const u8 sub_y = (y / 3) * 3 + j;
+      const auto sub_x = (x / 3) * 3 + i;
+      const auto sub_y = (y / 3) * 3 + j;
 
-      if (sub_x != x && sub_y != y && !collapsed[board[sub_x + sub_y * w]]) {
+      if (sub_x != x && sub_y != y) {
         auto &cell = board[sub_x + sub_y * w];
+        if ((cell & rev) == 0) return false;
+        if (collapsed[cell]) continue;
         cell &= rev;
-        if (collapsed[cell]) propagate(sub_x, sub_y);
+        if (collapsed[cell] && !propagate(sub_x, sub_y)) return false;
       }
     }
   }
+
+  return true;
 }
 
 void print_solution() {
@@ -96,7 +104,6 @@ bool solve() {
       }
     }
   }
-
   const auto lowest_entropy_pos = lowest_entropy_x + lowest_entropy_y * w;
 
   auto mask = board[lowest_entropy_pos];
@@ -109,9 +116,7 @@ bool solve() {
     auto val = mask & -mask;
 
     board[lowest_entropy_pos] = val;
-    propagate(lowest_entropy_x, lowest_entropy_y);
-
-    if (solve()) return true;
+    if (propagate(lowest_entropy_x, lowest_entropy_y) && solve()) return true;
 
     mask ^= val;
 
