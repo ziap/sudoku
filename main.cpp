@@ -4,6 +4,7 @@
 
 using u8 = uint8_t;
 using u16 = uint16_t;
+using u32 = uint32_t;
 
 constexpr u8 w = 9;
 constexpr u8 h = 9;
@@ -12,21 +13,22 @@ constexpr u16 full = (1 << 9) - 1;
 
 constexpr auto entropy = ([]() constexpr {
   constexpr auto len = 1 << 9;
-  std::array<u8, len> entropy;
-  for (auto i = 0u; i < len; i++) entropy[i] = std::popcount(i);
-  return entropy;
+  std::array<u8, len> result;
+  for (auto i = 0u; i < len; i++) result[i] = std::popcount(i);
+  return result;
 })();
 
-constexpr auto collapsed = ([]() constexpr {
+constexpr auto collapsed_value = ([]() constexpr {
   constexpr auto len = 1 << 9;
-  std::array<u8, len> collapsed = {0};
-  for (auto i = 0u; i < 9; i++) collapsed[1 << i] = i + 1;
-  return collapsed;
+  std::array<u8, len> result = {0};
+  for (auto i = 0u; i < 9; i++) result[1 << i] = i + 1;
+  return result;
 })();
 
 u16 board[w * h];
 
 u8 remaining = 81;
+u32 solutions = 0;
 
 bool propagate(u8 x, u8 y) {
   remaining--;
@@ -37,9 +39,9 @@ bool propagate(u8 x, u8 y) {
     if (i != x) {
       auto &cell = board[i + y * w];
       if ((cell & rev) == 0) return false;
-      if (collapsed[cell]) continue;
+      if (collapsed_value[cell]) continue;
       cell &= rev;
-      if (collapsed[cell] && !propagate(i, y)) return false;
+      if (collapsed_value[cell] && !propagate(i, y)) return false;
     }
   }
 
@@ -47,9 +49,9 @@ bool propagate(u8 x, u8 y) {
     if (i != y) {
       auto &cell = board[x + i * w];
       if ((cell & rev) == 0) return false;
-      if (collapsed[cell]) continue;
+      if (collapsed_value[cell]) continue;
       cell &= rev;
-      if (collapsed[cell] && !propagate(x, i)) return false;
+      if (collapsed_value[cell] && !propagate(x, i)) return false;
     }
   }
 
@@ -61,9 +63,9 @@ bool propagate(u8 x, u8 y) {
       if (sub_x != x && sub_y != y) {
         auto &cell = board[sub_x + sub_y * w];
         if ((cell & rev) == 0) return false;
-        if (collapsed[cell]) continue;
+        if (collapsed_value[cell]) continue;
         cell &= rev;
-        if (collapsed[cell] && !propagate(sub_x, sub_y)) return false;
+        if (collapsed_value[cell] && !propagate(sub_x, sub_y)) return false;
       }
     }
   }
@@ -74,10 +76,10 @@ bool propagate(u8 x, u8 y) {
 void print_solution() {
   for (auto i = 0; i < h; i++) {
     for (auto j = 0; j < w; j++) {
-      const auto val = collapsed[board[j + i * w]];
+      const auto val = collapsed_value[board[j + i * w]];
       if (val) std::cout << (int)val << ' ';
       else
-        std::cout << "? ";
+        std::cout << "! ";
       if (j % 3 == 2) std::cout << ' ';
     }
     std::cout << '\n';
@@ -85,46 +87,43 @@ void print_solution() {
   }
 }
 
-bool solve() {
+void solve() {
   if (remaining == 0) {
+    solutions++;
     print_solution();
-    return true;
+    return;
   }
 
-  auto lowest_entropy = 9;
-  u8 lowest_entropy_x, lowest_entropy_y;
+  u8 empty_x, empty_y;
 
-  for (auto i = 0; i < w; i++) {
-    for (auto j = 0; j < h; j++) {
-      const auto val = entropy[board[i + j * w]];
-      if (val > 1 && val < lowest_entropy) {
-        lowest_entropy = val;
-        lowest_entropy_x = i;
-        lowest_entropy_y = j;
-      }
+  for (auto i = 0;; i++) {
+    const auto val = entropy[board[i]];
+    if (val > 1) {
+      empty_x = i % w;
+      empty_y = i / w;
+      break;
     }
   }
-  const auto lowest_entropy_pos = lowest_entropy_x + lowest_entropy_y * w;
+
+  const auto lowest_entropy_pos = empty_x + empty_y * w;
 
   auto mask = board[lowest_entropy_pos];
 
   u16 last[w * h];
-  u8 last_remaining = remaining;
+  auto last_remaining = remaining;
   std::copy(board, board + (w * h), last);
 
   while (mask) {
     auto val = mask & -mask;
 
     board[lowest_entropy_pos] = val;
-    if (propagate(lowest_entropy_x, lowest_entropy_y) && solve()) return true;
+    if (propagate(empty_x, empty_y)) solve();
 
     mask ^= val;
 
     std::copy(last, last + (w * h), board);
     remaining = last_remaining;
   }
-
-  return false;
 }
 
 int main() {
@@ -138,7 +137,7 @@ int main() {
         const auto val = std::stoi(buf);
 
         auto &cell = board[j + i * w];
-        if (!collapsed[cell]) {
+        if (!collapsed_value[cell]) {
           cell = (1 << (val - 1));
           propagate(j, i);
         }
@@ -146,5 +145,7 @@ int main() {
     }
   }
 
-  if (!solve()) std::cout << "Can't solve board!\n";
+  solve();
+
+  std::cout << "Found " << solutions << " solutions\n";
 }
