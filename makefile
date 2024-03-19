@@ -1,5 +1,5 @@
 CXX=clang++
-FLAGS=-Wall -Wextra -O3 -march=native -mtune=native -std=c++20
+FLAGS=-Wall -Wextra -O3 -march=native -mtune=native -pedantic -std=c++20
 
 .PHONY: all clean
 

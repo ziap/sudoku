@@ -1,39 +1,26 @@
-#include <array>
+#include <stdint.h>
 #include <iostream>
 
-using u8 = uint8_t;
-using u16 = uint16_t;
-using u32 = uint32_t;
-
-constexpr u8 w = 9;
-constexpr u8 h = 9;
+#define popcnt32 __builtin_popcount
+#define ctz32    __builtin_ctz
 
 // We represent all possible values of a cell in a bitmap with length 9
-constexpr u16 full = 0x1ff;
+const uint16_t full = (1 << 9) - 1;
 
-// The possible values of a cell AKA the number of set bit
-constexpr auto entropy = ([]() constexpr {
-  constexpr auto len = 1 << 9;
-  std::array<u8, len> result;
-  for (auto i = 0u; i < len; i++) {
-    result[i] = 0;
-    for (auto mask = i; mask; mask &= (mask - 1)) result[i]++;
+typedef struct {
+  uint16_t entropy[81];
+  int remaining;
+} Solver;
+
+// Initialize the board with all possible values
+Solver Solver_init() {
+  Solver solver;
+  for (int i = 0; i < 81; ++i) {
+    solver.entropy[i] = full;
   }
-  return result;
-})();
-
-// Return a cell's value if it's collapsed otherwise 0
-constexpr auto collapsed_value = ([]() constexpr {
-  constexpr auto len = 1 << 9;
-  std::array<u8, len> result = {0};
-  for (auto i = 0u; i < 9; i++) result[1 << i] = i + 1;
-  return result;
-})();
-
-u16 board[w * h];
-
-// The number of uncollapsed cells
-u8 remaining = w * h;
+  solver.remaining = 81;
+  return solver;
+}
 
 // Constraint propagation:
 // - When a cell is collapsed, remove its value from the possible values of
@@ -41,45 +28,51 @@ u8 remaining = w * h;
 // - If any of those cells has one possible value left, collapse that cell and
 // do the same thing again.
 // - If any of those cells has no possible value, we reached an invalid state.
-bool propagate(u8 x, u8 y) {
-  remaining--;
+bool Solver_propagate(Solver *solver, int x, int y) {
+  --solver->remaining;
 
-  const auto rev = (~board[x + y * w] & full);
+  const uint16_t rev = (~solver->entropy[x + y * 9] & full);
 
   // Row
-  for (auto i = 0; i < w; i++) {
+  for (int i = 0; i < 9; i++) {
     if (i != x) {
-      auto &cell = board[i + y * w];
-      if ((cell & rev) == 0) return false;
-      if (collapsed_value[cell]) continue;
-      cell &= rev;
-      if (collapsed_value[cell] && !propagate(i, y)) return false;
+      uint16_t *cell = solver->entropy + (i + y * 9);
+      if ((*cell & rev) == 0) return false;
+      if (popcnt32(*cell) == 1) continue;
+      *cell &= rev;
+      if (popcnt32(*cell) == 1 && !Solver_propagate(solver, i, y)) {
+        return false;
+      }
     }
   }
 
   // Collumn
-  for (auto i = 0; i < h; i++) {
+  for (int i = 0; i < 9; i++) {
     if (i != y) {
-      auto &cell = board[x + i * w];
-      if ((cell & rev) == 0) return false;
-      if (collapsed_value[cell]) continue;
-      cell &= rev;
-      if (collapsed_value[cell] && !propagate(x, i)) return false;
+      uint16_t *cell = solver->entropy + (x + i * 9);
+      if ((*cell & rev) == 0) return false;
+      if (popcnt32(*cell) == 1) continue;
+      *cell &= rev;
+      if (popcnt32(*cell) == 1 && !Solver_propagate(solver, x, i)) {
+        return false;
+      }
     }
   }
 
   // Box
-  for (auto i = 0; i < 3; i++) {
-    for (auto j = 0; j < 3; j++) {
-      const auto sub_x = (x / 3) * 3 + i;
-      const auto sub_y = (y / 3) * 3 + j;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      const int sub_x = (x / 3) * 3 + i;
+      const int sub_y = (y / 3) * 3 + j;
 
       if (sub_x != x && sub_y != y) {
-        auto &cell = board[sub_x + sub_y * w];
-        if ((cell & rev) == 0) return false;
-        if (collapsed_value[cell]) continue;
-        cell &= rev;
-        if (collapsed_value[cell] && !propagate(sub_x, sub_y)) return false;
+        uint16_t *cell = solver->entropy + (sub_x + sub_y * 9);
+        if ((*cell & rev) == 0) return false;
+        if (popcnt32(*cell) == 1) continue;
+        *cell &= rev;
+        if (popcnt32(*cell) == 1 && !Solver_propagate(solver, sub_x, sub_y)) {
+          return false;
+        }
       }
     }
   }
@@ -87,45 +80,56 @@ bool propagate(u8 x, u8 y) {
   return true;
 }
 
+bool Solver_insert(Solver *solver, int x, int y, int val) {
+  uint16_t *cell = solver->entropy + (x + y * 9);
+  uint16_t mask = (1 << (val - 1));
+  if (*cell & mask) {
+    if (*cell != mask) {
+      *cell = mask;
+      Solver_propagate(solver, x, y);
+    }
+    return true;
+  }
+  return false;
+}
+
 // Solve a sudoku board:
 // - Find the first non collapsed cell
 // - For each possible value of that cell, collapse it to that value
 // - Try to recursively solve each subsequent board
-bool solve() {
+bool Solver_solve(Solver *solver) {
   // The board is already solved
-  if (remaining == 0) return true;
+  if (solver->remaining == 0) return true;
 
-  u8 lowest_x, lowest_y;
-
-  for (auto i = 0;; i++) {
-    const auto val = entropy[board[i]];
+  int target_x, target_y;
+  for (int i = 0; ; i++) {
+    const int val = popcnt32(solver->entropy[i]);
     if (val > 1) {
-      lowest_x = i % w;
-      lowest_y = i / w;
+      target_x = i % 9;
+      target_y = i / 9;
       break;
     }
   }
 
-  const auto lowest_entropy_pos = lowest_x + lowest_y * w;
+  const int target_pos = target_x + target_y * 9;
 
-  auto mask = board[lowest_entropy_pos];
+  uint16_t mask = solver->entropy[target_pos];
 
   // Store the previous state so we can backtrack
-  u16 last[w * h];
-  auto last_remaining = remaining;
-  std::copy(board, board + (w * h), last);
+  Solver last = *solver;
 
   while (mask) {
-    auto val = mask & -mask;
+    uint16_t val = mask & -mask;
     mask ^= val;
 
     // Collapse, propagate the value and try to solve the resulting board
-    board[lowest_entropy_pos] = val;
-    if (propagate(lowest_x, lowest_y) && solve()) return true;
+    solver->entropy[target_pos] = val;
+    if (Solver_propagate(solver, target_x, target_y) && Solver_solve(solver)) {
+      return true;
+    }
 
     // Backtrack
-    std::copy(last, last + (w * h), board);
-    remaining = last_remaining;
+    *solver = last;
   }
 
   // We tried all the value, the board is unsolvable
@@ -134,34 +138,30 @@ bool solve() {
 
 int main() {
   // Initialize the board with all possible values
-  std::fill(board, board + w * h, full);
+  Solver solver = Solver_init();
 
   // Read stdin and fill the board
   // NOTE: no file support, to read a file pipe it to stdin
   // TODO: improve input with better error handling
-  for (auto i = 0; i < h; i++) {
-    for (auto j = 0; j < w; j++) {
+  for (int i = 0; i < 9; i++) {
+    for (int j = 0; j < 9; j++) {
       std::string buf;
       std::cin >> buf;
       if (buf != "-") {
-        const auto val = std::stoi(buf);
-
-        auto &cell = board[j + i * w];
-        if (!collapsed_value[cell]) {
-          cell = (1 << (val - 1));
-          propagate(j, i);
-        }
+        Solver_insert(&solver, j, i, std::stoi(buf));
       }
     }
   }
 
-  if (solve()) {
-    for (auto i = 0; i < h; i++) {
-      for (auto j = 0; j < w; j++) {
-        const auto val = collapsed_value[board[j + i * w]];
-        if (val) std::cout << u8(val + '0') << ' ';
-        else
+  if (Solver_solve(&solver)) {
+    for (int i = 0; i < 9; i++) {
+      for (int j = 0; j < 9; j++) {
+        const int val = solver.entropy[j + i * 9];
+        if (popcnt32(val) == 1) {
+          std::cout << (char)(ctz32(solver.entropy[j + i * 9]) + '1') << ' ';
+        } else {
           std::cout << "! ";
+        }
         if (j % 3 == 2) std::cout << ' ';
       }
       std::cout << '\n';
