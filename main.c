@@ -86,7 +86,12 @@ int main(int argc, char** argv) {
   Puzzles puzzles = Puzzles_parse(argv[1]);
   if (puzzles.data == NULL) return 1;
 
+  if (puzzles.len == 1) printf("Loaded a puzzle from `%s`\n", argv[1]);
+  else  printf("Loaded %d puzzles from `%s`\n", puzzles.len, argv[1]);
+
   char *result = malloc(puzzles.len * 82);
+  int unsolved = 0;
+  int invalid  = 0;
   
   clock_t start = clock();
   for (int t = 0; t < puzzles.len; ++t) {
@@ -94,23 +99,38 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 9; ++i) {
       for (int j = 0; j < 9; ++j) {
         int val = puzzles.data[t].matrix[i][j];
-        if (val) Solver_insert(&solver, j, i, val);
+        if (val && !Solver_insert(&solver, j, i, val)) ++invalid;
       }
     }
 
-    Solver_solve(&solver);
+    if (!Solver_solve(&solver)) ++unsolved;
     Solver_write(&solver, result + (82 * t));
 
     result[82 * t + 81] = '\n';
   }
   clock_t end = clock();
+  double speed = (double)(puzzles.len * CLOCKS_PER_SEC) / (end - start);
 
-  printf("Solving speed: %.2f puzzles/s\n",
-         (double)(puzzles.len * CLOCKS_PER_SEC) / (end - start));
+  printf("Solving speed: %.2f puzzles/s\n", speed);
+  if (unsolved) {
+    if (unsolved == 1) {
+      printf("A puzzle can't be solved\n");
+    } else {
+      printf("%d puzzles can't be solved\n", unsolved);
+    }
+  }
+  if (invalid) {
+    if (invalid == 1) {
+      printf("A puzzle is invalid\n");
+    } else {
+      printf("%d puzzles are invalid\n", invalid);
+    }
+  }
 
   if (argc > 2) {
     FILE *f = fopen(argv[2], "wb");
     if (f) {
+      printf("Results saved to `%s`\n", argv[2]);
       fwrite(result, puzzles.len * 82, 1, f);
       fclose(f);
     } else {

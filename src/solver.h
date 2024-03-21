@@ -7,6 +7,7 @@
 typedef struct {
   uint16_t possibilities[81];
   int remaining;
+  uint32_t collapsed[3];
 } Solver;
 
 // Initialize the board with all possible values

@@ -1,4 +1,5 @@
 #include "solver.h"
+#include <stdint.h>
 
 #define popcnt32 __builtin_popcount
 #define ctz32    __builtin_ctz
@@ -7,11 +8,13 @@
 const uint16_t full = (1 << 9) - 1;
 
 Solver Solver_new(void) {
-  Solver solver;
+  Solver solver = {
+    .remaining = 81,
+    .collapsed = {0, 0, 0},
+  };
   for (int i = 0; i < 81; ++i) {
     solver.possibilities[i] = full;
   }
-  solver.remaining = 81;
   return solver;
 }
 
@@ -22,50 +25,68 @@ Solver Solver_new(void) {
 // do the same thing again.
 // - If any of those cells has no possible value, we reached an invalid state.
 static bool Solver_propagate(Solver *solver, int x, int y) {
+  const int pos = x + y * 9;
   --solver->remaining;
+  solver->collapsed[pos >> 5] |= ((uint32_t)1 << (pos & 0x1f));
 
-  const uint16_t rev = (~solver->possibilities[x + y * 9]) & full;
+  const uint16_t old = solver->possibilities[pos];
 
-  // Row
-  for (int i = 0; i < 9; i++) {
-    if (i != x) {
-      uint16_t *cell = solver->possibilities + (i + y * 9);
-      if ((*cell & rev) == 0) return false;
-      if (popcnt32(*cell) == 1) continue;
-      *cell &= rev;
-      if (popcnt32(*cell) == 1 && !Solver_propagate(solver, i, y)) {
-        return false;
-      }
-    }
-  }
+  const uint16_t rev = ~old & full;
 
-  // Collumn
-  for (int i = 0; i < 9; i++) {
-    if (i != y) {
-      uint16_t *cell = solver->possibilities + (x + i * 9);
-      if ((*cell & rev) == 0) return false;
-      if (popcnt32(*cell) == 1) continue;
-      *cell &= rev;
-      if (popcnt32(*cell) == 1 && !Solver_propagate(solver, x, i)) {
-        return false;
-      }
-    }
-  }
+  for (int i = 0; i < 9; ++i) solver->possibilities[i + y * 9] &= rev;
+  for (int i = 0; i < 9; ++i) solver->possibilities[x + i * 9] &= rev;
 
-  // Box
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       const int sub_x = (x / 3) * 3 + i;
       const int sub_y = (y / 3) * 3 + j;
 
-      if (sub_x != x && sub_y != y) {
-        uint16_t *cell = solver->possibilities + (sub_x + sub_y * 9);
-        if ((*cell & rev) == 0) return false;
-        if (popcnt32(*cell) == 1) continue;
-        *cell &= rev;
-        if (popcnt32(*cell) == 1 && !Solver_propagate(solver, sub_x, sub_y)) {
-          return false;
-        }
+      solver->possibilities[sub_x + sub_y * 9] &= rev;
+    }
+  }
+
+  solver->possibilities[pos] = old;
+
+  for (int i = 0; i < 9; ++i) if (solver->possibilities[i + y * 9] == 0) return false;
+  for (int i = 0; i < 9; ++i) if (solver->possibilities[x + i * 9] == 0) return false;
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      const int sub_x = (x / 3) * 3 + i;
+      const int sub_y = (y / 3) * 3 + j;
+
+      if (solver->possibilities[sub_x + sub_y * 9] == 0) return false;
+    }
+  }
+
+  for (int i = 0; i < 9; ++i) {
+    const int next_pos = i + y * 9;
+    if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+        !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
+        !Solver_propagate(solver, i, y)) {
+      return false;
+    }
+  }
+
+  for (int i = 0; i < 9; ++i) {
+    const int next_pos = x + i * 9;
+    if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+        !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
+        !Solver_propagate(solver, x, i)) {
+      return false;
+    }
+  }
+
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      const int sub_x = (x / 3) * 3 + i;
+      const int sub_y = (y / 3) * 3 + j;
+
+      const int next_pos = sub_x + sub_y * 9;
+      if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+          !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
+          !Solver_propagate(solver, sub_x, sub_y)) {
+        return false;
       }
     }
   }
@@ -75,7 +96,7 @@ static bool Solver_propagate(Solver *solver, int x, int y) {
 
 bool Solver_insert(Solver *solver, int x, int y, int val) {
   uint16_t *cell = solver->possibilities + (x + y * 9);
-  uint16_t mask = (1 << (val - 1));
+  const uint16_t mask = (1 << (val - 1));
   if (*cell & mask) {
     if (*cell != mask) {
       *cell = mask;
