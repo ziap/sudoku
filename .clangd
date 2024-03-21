@@ -1,2 +1,2 @@
 CompileFlags:
-  Add: [-Wall, -Wextra, -std=c++20]
+  Add: [-xc, -Wall, -Wextra, -pedantic, -Isrc]
