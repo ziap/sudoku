@@ -9,4 +9,4 @@ DEBUG_FLAGS="-Og -ggdb"
 
 SRCS="$(ls src/*.c)"
 
-$CC $CFLAG $LDLIBS $BUILD_FLAGS -o main main.c $SRCS -I src
+$CC $CFLAG $LDLIBS $BUILD_FLAGS -o sudoku main.c $SRCS -I src

@@ -57,7 +57,8 @@ Puzzles Puzzles_parse(const char* file_path) {
       } else if (c == '.') {
         result.data[result.len].arr[col] = 0;
       } else {
-        fprintf(stderr, "%s:%d:%d: Invalid character: `%c`", file_path, line + 1, col, c);
+        fprintf(stderr, "%s:%d:%d: Invalid character: `%c`", file_path,
+                line + 1, col, c);
         free(result.data);
         result.data = NULL;
         result.len = 0;
@@ -103,8 +104,9 @@ int main(int argc, char** argv) {
     result[82 * t + 81] = '\n';
   }
   clock_t end = clock();
-  
-  printf("Solving speed: %.2f puzzles/s\n", (double)(puzzles.len * CLOCKS_PER_SEC) / (end - start));
+
+  printf("Solving speed: %.2f puzzles/s\n",
+         (double)(puzzles.len * CLOCKS_PER_SEC) / (end - start));
 
   if (argc > 2) {
     FILE *f = fopen(argv[2], "wb");

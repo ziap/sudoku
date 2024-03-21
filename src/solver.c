@@ -21,7 +21,7 @@ Solver Solver_new(void) {
 // - If any of those cells has one possible value left, collapse that cell and
 // do the same thing again.
 // - If any of those cells has no possible value, we reached an invalid state.
-bool Solver_propagate(Solver *solver, int x, int y) {
+static bool Solver_propagate(Solver *solver, int x, int y) {
   --solver->remaining;
 
   const uint16_t rev = (~solver->possibilities[x + y * 9]) & full;
