@@ -1,6 +1,6 @@
 # Sudoku solver using constraint propagation
 
-Moderately-fast Sodoku solver with constraint propagation and back-tracking in C.
+A moderately fast Sudoku solver with constraint propagation and back-tracking in C.
 
 ## Example
 
@@ -18,8 +18,8 @@ CC=gcc ./build.sh
 
 ### Running
 
-Currently the only way to input a puzzle is through a file. We'll test with
-this case from Wikipeia which is designed against brute force algorithms.
+Currently, the only way to input a puzzle is through a file. We'll test with
+this case from Wikipedia, which is designed against brute force algorithms.
 
 ![](https://upload.wikimedia.org/wikipedia/commons/e/ed/Sudoku_puzzle_hard_for_brute_force.svg)
 
@@ -43,8 +43,9 @@ an average estimation.
 ./sudoku example.txt example-result.txt
 ```
 
-This runs the program with the file that we just created, and output the result
-to the file `example-result.txt`. The program will also output the solving speed:
+This runs the program with the file that we just created, and outputs the
+result to the file `example-result.txt`. The program will also output the
+solving speed:
 
 ```
 Solving speed: 567.83 puzzles/s
@@ -53,7 +54,7 @@ Solving speed: 567.83 puzzles/s
 Or about 0.0018 seconds per puzzle.
 
 You can run the program in the provided [dataset](data.tar.gz), which is a
-subset of the dataset provided in <https://github.com/t-dillon/tdoku>.
+subset of the dataset provided at <https://github.com/t-dillon/tdoku>.
 
 ```sh
 tar xf data.tar.gz
@@ -64,10 +65,11 @@ tar xf data.tar.gz
 ## TODO
 
 - Optimizations:
+    - Hidden single constraint
     - Better constraint representation
-    - ...
+    - SIMD optimization
 - Visualization
-- Create sudoku generator and web app
+- Create a Sudoku generator and web app
 
 ## License
 

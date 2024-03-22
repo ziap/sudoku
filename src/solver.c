@@ -30,18 +30,17 @@ static bool Solver_propagate(Solver *solver, int x, int y) {
   solver->collapsed[pos >> 5] |= ((uint32_t)1 << (pos & 0x1f));
 
   const uint16_t old = solver->possibilities[pos];
+  const uint16_t inv = ~old;
 
-  const uint16_t rev = ~old & full;
-
-  for (int i = 0; i < 9; ++i) solver->possibilities[i + y * 9] &= rev;
-  for (int i = 0; i < 9; ++i) solver->possibilities[x + i * 9] &= rev;
+  for (int i = 0; i < 9; ++i) solver->possibilities[i + y * 9] &= inv;
+  for (int i = 0; i < 9; ++i) solver->possibilities[x + i * 9] &= inv;
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       const int sub_x = (x / 3) * 3 + i;
       const int sub_y = (y / 3) * 3 + j;
 
-      solver->possibilities[sub_x + sub_y * 9] &= rev;
+      solver->possibilities[sub_x + sub_y * 9] &= inv;
     }
   }
 
