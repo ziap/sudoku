@@ -60,7 +60,8 @@ static bool Solver_propagate(Solver *solver, int x, int y) {
 
   for (int i = 0; i < 9; ++i) {
     const int next_pos = i + y * 9;
-    if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+    const uint16_t val = solver->possibilities[next_pos];
+    if (!(val & (val - 1)) &&
         !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
         !Solver_propagate(solver, i, y)) {
       return false;
@@ -69,7 +70,8 @@ static bool Solver_propagate(Solver *solver, int x, int y) {
 
   for (int i = 0; i < 9; ++i) {
     const int next_pos = x + i * 9;
-    if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+    const uint16_t val = solver->possibilities[next_pos];
+    if (!(val & (val - 1)) &&
         !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
         !Solver_propagate(solver, x, i)) {
       return false;
@@ -82,7 +84,8 @@ static bool Solver_propagate(Solver *solver, int x, int y) {
       const int sub_y = (y / 3) * 3 + j;
 
       const int next_pos = sub_x + sub_y * 9;
-      if (popcnt32(solver->possibilities[next_pos]) == 1 &&
+      const uint16_t val = solver->possibilities[next_pos];
+      if (!(val & (val - 1)) &&
           !((solver->collapsed[next_pos >> 5] >> (next_pos & 0x1f)) & 0x1) &&
           !Solver_propagate(solver, sub_x, sub_y)) {
         return false;
@@ -133,10 +136,10 @@ bool Solver_solve(Solver *solver) {
   uint16_t mask = solver->possibilities[target_pos];
 
   // Store the previous state so we can backtrack
-  Solver last = *solver;
+  const Solver last = *solver;
 
   while (mask) {
-    uint16_t val = mask & -mask;
+    const uint16_t val = mask & -mask;
     mask ^= val;
 
     // Collapse, propagate the value and try to solve the resulting board
@@ -155,8 +158,8 @@ bool Solver_solve(Solver *solver) {
 
 void Solver_write(Solver *restrict solver, char buf[restrict 81]) {
   for (int i = 0; i < 81; ++i) {
-    uint16_t val = solver->possibilities[i];
-    if (popcnt32(val) == 1) {
+    const uint16_t val = solver->possibilities[i];
+    if (!(val & (val - 1))) {
       buf[i] = ctz32(solver->possibilities[i]) + '1';
     } else {
       buf[i] = '.';
